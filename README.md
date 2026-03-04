@@ -2,7 +2,7 @@
 
 A macOS menu bar app that shows your Claude Code usage in close to real-time.
 
-> **Requirements**: macOS 14+, must be logged in via `claude login`
+> **Requirements**: macOS 14+, Xcode (not just Command Line Tools), must be logged in via `claude login`
 
 ## Install
 
