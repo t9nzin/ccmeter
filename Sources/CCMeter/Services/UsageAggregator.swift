@@ -25,22 +25,47 @@ final class UsageAggregator {
     }
 
     @ObservationIgnored
-    private var pollTimer: Timer?
+    private var fallbackTimer: Timer?
+
+    @ObservationIgnored
+    private var hookServer: HookServer?
+
+    @ObservationIgnored
+    private var lastFetchTime: Date?
 
     func start() {
         // Fetch immediately on launch
         Task { await fetchUsage() }
 
-        // Start polling
-        pollTimer = Timer.scheduledTimer(withTimeInterval: Constants.defaultPollInterval, repeats: true) { [weak self] _ in
+        // Fallback poll timer (safety net when hooks aren't configured)
+        fallbackTimer = Timer.scheduledTimer(withTimeInterval: Constants.fallbackPollInterval, repeats: true) { [weak self] _ in
             guard let self else { return }
             Task { await self.fetchUsage() }
         }
+
+        // Start the hook server
+        hookServer = HookServer { [weak self] in
+            self?.hookTriggered()
+        }
+        hookServer?.start()
     }
 
     func stop() {
-        pollTimer?.invalidate()
-        pollTimer = nil
+        fallbackTimer?.invalidate()
+        fallbackTimer = nil
+        hookServer?.stop()
+        hookServer = nil
+    }
+
+    /// Called by HookServer when a Claude Code hook event arrives.
+    private func hookTriggered() {
+        // Debounce: skip if we fetched too recently
+        if let lastFetch = lastFetchTime,
+           Date().timeIntervalSince(lastFetch) < Constants.hookDebounceInterval {
+            return
+        }
+
+        Task { await fetchUsage() }
     }
 
     @MainActor
@@ -52,29 +77,9 @@ final class UsageAggregator {
             let data = try await APIService.fetchUsage()
             usageData = data
             lastError = nil
-            adjustPollInterval()
+            lastFetchTime = Date()
         } catch {
             lastError = describeError(error)
-        }
-    }
-
-    private func adjustPollInterval() {
-        let maxUtil = max(sessionUtilization, weeklyUtilization)
-        let interval: TimeInterval
-        if maxUtil >= 90 {
-            interval = Constants.minPollInterval
-        } else if maxUtil >= 75 {
-            interval = 45
-        } else if maxUtil >= 50 {
-            interval = Constants.defaultPollInterval
-        } else {
-            interval = Constants.maxPollInterval
-        }
-
-        pollTimer?.invalidate()
-        pollTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
-            guard let self else { return }
-            Task { await self.fetchUsage() }
         }
     }
 

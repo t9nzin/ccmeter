@@ -11,8 +11,10 @@ enum Constants {
         static let serviceName = "Claude Code-credentials"
     }
 
-    // Polling intervals (seconds)
-    static let defaultPollInterval: TimeInterval = 60.0
-    static let minPollInterval: TimeInterval = 30.0
-    static let maxPollInterval: TimeInterval = 300.0
+    // Fallback polling interval (seconds) — used when hooks aren't configured
+    static let fallbackPollInterval: TimeInterval = 300.0
+
+    // Hook server
+    static let hookServerPort: UInt16 = 19199
+    static let hookDebounceInterval: TimeInterval = 2.0
 }
