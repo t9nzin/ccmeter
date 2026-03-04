@@ -1,4 +1,4 @@
-# CCMeter - Claude Code Usage Meter <img src="demo.png" width="70" />
+# CCMeter <img src="demo.png" width="450" />
 
 A macOS menu bar app that shows your Claude Code usage in close to real-time.
 
