@@ -12,7 +12,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
 
         if let button = statusItem.button {
-            button.image = NSImage(systemSymbolName: "gauge.medium", accessibilityDescription: "CCMeter")
+            button.image = MenuBarIcon.generateIcon(percentage: 0)
             button.imagePosition = .imageLeading
             button.title = "–"
             button.action = #selector(togglePopover)
@@ -29,22 +29,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         aggregator.start()
 
-        // Observe changes to update menu bar text
+        // Observe changes to update menu bar icon + text
         observation = withObservationTracking {
             _ = aggregator.menuBarText
         } onChange: { [weak self] in
             DispatchQueue.main.async {
-                self?.updateMenuBarText()
+                self?.updateMenuBar()
             }
         }
-        updateMenuBarText()
+        updateMenuBar()
     }
 
     func applicationWillTerminate(_ notification: Notification) {
         aggregator.stop()
     }
 
-    private func updateMenuBarText() {
+    private func updateMenuBar() {
+        statusItem?.button?.image = MenuBarIcon.generateIcon(percentage: aggregator.sessionUtilization)
         statusItem?.button?.title = aggregator.menuBarText
 
         // Re-register observation
@@ -52,7 +53,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             _ = aggregator.menuBarText
         } onChange: { [weak self] in
             DispatchQueue.main.async {
-                self?.updateMenuBarText()
+                self?.updateMenuBar()
             }
         }
     }

@@ -1,21 +1,18 @@
 import Foundation
 
 enum Constants {
-    static let claudeProjectsPath: String = {
-        let home = FileManager.default.homeDirectoryForCurrentUser.path
-        return "\(home)/.claude/projects"
-    }()
+    enum API {
+        static let baseURL = "https://api.anthropic.com"
+        static let usageEndpoint = "/api/oauth/usage"
+        static let anthropicBeta = "oauth-2025-04-20"
+    }
 
-    // Pro plan defaults
-    static let defaultSessionOutputTokenLimit = 300_000
-    static let defaultWeeklyOutputTokenLimit = 3_500_000
+    enum Keychain {
+        static let serviceName = "Claude Code-credentials"
+    }
 
-    // Timing
-    static let pollInterval: TimeInterval = 2.0
-    static let directoryScanInterval: TimeInterval = 30.0
-    static let weeklyRescanInterval: TimeInterval = 300.0 // 5 minutes
-
-    // Storage keys
-    static let sessionTokenLimitKey = "sessionTokenLimit"
-    static let weeklyTokenLimitKey = "weeklyTokenLimit"
+    // Polling intervals (seconds)
+    static let defaultPollInterval: TimeInterval = 60.0
+    static let minPollInterval: TimeInterval = 30.0
+    static let maxPollInterval: TimeInterval = 300.0
 }

@@ -2,19 +2,18 @@ import SwiftUI
 
 struct UsageBarView: View {
     let label: String
-    let currentTokens: Int
-    let limit: Int
+    let utilization: Double // 0-100
     let tintColor: Color
+    var resetsAt: Date? = nil
 
-    private var percentage: Double {
-        guard limit > 0 else { return 0 }
-        return min(Double(currentTokens) / Double(limit), 1.0)
+    private var fraction: Double {
+        min(utilization / 100.0, 1.0)
     }
 
     private var barColor: Color {
-        if percentage >= 0.9 {
+        if utilization >= 90 {
             return .red
-        } else if percentage >= 0.75 {
+        } else if utilization >= 75 {
             return .orange
         }
         return tintColor
@@ -27,7 +26,7 @@ struct UsageBarView: View {
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(.secondary)
                 Spacer()
-                Text("\(Int(percentage * 100))%")
+                Text("\(Int(utilization.rounded()))%")
                     .font(.system(size: 12, weight: .semibold).monospacedDigit())
                     .foregroundStyle(barColor)
             }
@@ -40,15 +39,17 @@ struct UsageBarView: View {
 
                     RoundedRectangle(cornerRadius: 4)
                         .fill(barColor)
-                        .frame(width: max(0, geometry.size.width * percentage), height: 8)
-                        .animation(.easeInOut(duration: 0.3), value: percentage)
+                        .frame(width: max(0, geometry.size.width * fraction), height: 8)
+                        .animation(.easeInOut(duration: 0.3), value: fraction)
                 }
             }
             .frame(height: 8)
 
-            Text("\(TokenFormatter.format(currentTokens)) / \(TokenFormatter.format(limit)) tokens")
-                .font(.system(size: 10))
-                .foregroundStyle(.tertiary)
+            if let resetsAt {
+                Text("Resets \(resetsAt, style: .relative)")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.tertiary)
+            }
         }
     }
 }

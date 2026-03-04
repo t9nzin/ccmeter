@@ -3,154 +3,94 @@ import SwiftUI
 
 @Observable
 final class UsageAggregator {
-    var sessionOutputTokens: Int = 0
-    var weeklyOutputTokens: Int = 0
-    var activeSessionId: String?
-    var isSessionActive: Bool = false
+    var usageData: UsageData?
+    var lastError: String?
+    var isLoading: Bool = false
 
-    var sessionTokenLimit: Int {
-        didSet { UserDefaults.standard.set(sessionTokenLimit, forKey: Constants.sessionTokenLimitKey) }
-    }
-    var weeklyTokenLimit: Int {
-        didSet { UserDefaults.standard.set(weeklyTokenLimit, forKey: Constants.weeklyTokenLimitKey) }
+    var sessionUtilization: Double {
+        usageData?.fiveHour?.utilization ?? 0
     }
 
-    @ObservationIgnored
-    private let watcher = SessionWatcher()
-
-    @ObservationIgnored
-    private var weeklyRescanTimer: Timer?
-
-    @ObservationIgnored
-    private var sessionUsage = UsageSnapshot()
-
-    @ObservationIgnored
-    private var weeklyUsage = UsageSnapshot()
-
-    init() {
-        let defaults = UserDefaults.standard
-        let savedSession = defaults.integer(forKey: Constants.sessionTokenLimitKey)
-        let savedWeekly = defaults.integer(forKey: Constants.weeklyTokenLimitKey)
-        self.sessionTokenLimit = savedSession > 0 ? savedSession : Constants.defaultSessionOutputTokenLimit
-        // Migrate from old 1.5M default to new 3.5M default
-        if savedWeekly == 1_500_000 || savedWeekly == 0 {
-            self.weeklyTokenLimit = Constants.defaultWeeklyOutputTokenLimit
-        } else {
-            self.weeklyTokenLimit = savedWeekly
-        }
+    var weeklyUtilization: Double {
+        usageData?.sevenDay?.utilization ?? 0
     }
 
-    var sessionPercentage: Double {
-        guard sessionTokenLimit > 0 else { return 0 }
-        return min(Double(sessionOutputTokens) / Double(sessionTokenLimit), 1.0)
-    }
-
-    var weeklyPercentage: Double {
-        guard weeklyTokenLimit > 0 else { return 0 }
-        return min(Double(weeklyOutputTokens) / Double(weeklyTokenLimit), 1.0)
+    var weeklyOpusUtilization: Double {
+        usageData?.sevenDayOpus?.utilization ?? 0
     }
 
     var menuBarText: String {
-        "\(Int(weeklyPercentage * 100))%"
+        guard usageData != nil else { return "–" }
+        return "\(Int(sessionUtilization.rounded()))%"
     }
 
+    @ObservationIgnored
+    private var pollTimer: Timer?
+
     func start() {
-        // Initial weekly scan
-        performWeeklyScan()
+        // Fetch immediately on launch
+        Task { await fetchUsage() }
 
-        // Set up watcher callbacks
-        watcher.onActiveSessionChanged = { [weak self] sessionId in
+        // Start polling
+        pollTimer = Timer.scheduledTimer(withTimeInterval: Constants.defaultPollInterval, repeats: true) { [weak self] _ in
             guard let self else { return }
-            self.activeSessionId = sessionId
-            self.isSessionActive = sessionId != nil
-
-            // Reset session counter for new session
-            self.sessionUsage = UsageSnapshot()
-            self.sessionOutputTokens = 0
-
-            // Parse the active session fully to get its current usage
-            if let sessionId {
-                self.loadActiveSessionUsage(sessionId)
-            }
-        }
-
-        watcher.onUsageUpdate = { [weak self] _, lines in
-            guard let self else { return }
-            for line in lines {
-                self.sessionUsage.add(line.usage)
-                self.weeklyUsage.add(line.usage)
-            }
-            self.sessionOutputTokens = self.sessionUsage.outputTokens
-            self.weeklyOutputTokens = self.weeklyUsage.outputTokens
-        }
-
-        watcher.start()
-
-        // Periodic full weekly rescan
-        weeklyRescanTimer = Timer.scheduledTimer(
-            withTimeInterval: Constants.weeklyRescanInterval,
-            repeats: true
-        ) { [weak self] _ in
-            self?.performWeeklyScan()
+            Task { await self.fetchUsage() }
         }
     }
 
     func stop() {
-        watcher.stop()
-        weeklyRescanTimer?.invalidate()
-        weeklyRescanTimer = nil
+        pollTimer?.invalidate()
+        pollTimer = nil
     }
 
-    private func performWeeklyScan() {
-        let cutoff = Calendar.current.date(byAdding: .day, value: -7, to: Date()) ?? Date()
-        let (perSession, total) = watcher.scanAllFiles(since: cutoff)
+    @MainActor
+    func fetchUsage() async {
+        isLoading = true
+        defer { isLoading = false }
 
-        weeklyUsage = total
-        weeklyOutputTokens = total.outputTokens
-
-        // If there's an active session, load its usage
-        if let activeId = watcher.getActiveSessionId() {
-            activeSessionId = activeId
-            isSessionActive = true
-            if let sessionSnap = perSession[activeId] {
-                sessionUsage = sessionSnap
-                sessionOutputTokens = sessionSnap.outputTokens
-            }
+        do {
+            let data = try await APIService.fetchUsage()
+            usageData = data
+            lastError = nil
+            adjustPollInterval()
+        } catch {
+            lastError = describeError(error)
         }
     }
 
-    private func loadActiveSessionUsage(_ sessionId: String) {
-        // The session watcher already parsed the file during scan,
-        // so the tracked file's usage is our session usage.
-        // We just need to find files matching this session ID.
-        let fm = FileManager.default
-        guard let projectDirs = try? fm.contentsOfDirectory(atPath: Constants.claudeProjectsPath) else { return }
-
-        var snapshot = UsageSnapshot()
-        for dir in projectDirs {
-            let filePath = "\(Constants.claudeProjectsPath)/\(dir)/\(sessionId).jsonl"
-            if let usage = watcher.getTrackedUsage(for: filePath) {
-                snapshot.inputTokens += usage.inputTokens
-                snapshot.outputTokens += usage.outputTokens
-                snapshot.cacheCreationTokens += usage.cacheCreationTokens
-                snapshot.cacheReadTokens += usage.cacheReadTokens
-            }
-
-            // Also check subagents
-            let subagentDir = "\(Constants.claudeProjectsPath)/\(dir)/\(sessionId)/subagents"
-            guard let subFiles = try? fm.contentsOfDirectory(atPath: subagentDir) else { continue }
-            for subFile in subFiles where subFile.hasSuffix(".jsonl") {
-                let subPath = "\(subagentDir)/\(subFile)"
-                if let usage = watcher.getTrackedUsage(for: subPath) {
-                    snapshot.inputTokens += usage.inputTokens
-                    snapshot.outputTokens += usage.outputTokens
-                    snapshot.cacheCreationTokens += usage.cacheCreationTokens
-                    snapshot.cacheReadTokens += usage.cacheReadTokens
-                }
-            }
+    private func adjustPollInterval() {
+        let maxUtil = max(sessionUtilization, weeklyUtilization)
+        let interval: TimeInterval
+        if maxUtil >= 90 {
+            interval = Constants.minPollInterval
+        } else if maxUtil >= 75 {
+            interval = 45
+        } else if maxUtil >= 50 {
+            interval = Constants.defaultPollInterval
+        } else {
+            interval = Constants.maxPollInterval
         }
 
-        sessionUsage = snapshot
-        sessionOutputTokens = snapshot.outputTokens
+        pollTimer?.invalidate()
+        pollTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
+            guard let self else { return }
+            Task { await self.fetchUsage() }
+        }
+    }
+
+    private func describeError(_ error: Error) -> String {
+        if let apiError = error as? APIService.APIError {
+            switch apiError {
+            case .noToken:
+                return "No Claude login found. Run 'claude login' first."
+            case .invalidURL:
+                return "Invalid API URL"
+            case .requestFailed(let code):
+                return "API error (\(code))"
+            case .decodingFailed:
+                return "Failed to parse usage data"
+            }
+        }
+        return error.localizedDescription
     }
 }

@@ -2,42 +2,55 @@ import SwiftUI
 
 struct PopoverView: View {
     let aggregator: UsageAggregator
-    @State private var showSettings = false
 
     var body: some View {
         VStack(spacing: 12) {
+            if let error = aggregator.lastError {
+                HStack {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.yellow)
+                        .font(.system(size: 11))
+                    Text(error)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                }
+            }
+
             UsageBarView(
-                label: "Session",
-                currentTokens: aggregator.sessionOutputTokens,
-                limit: aggregator.sessionTokenLimit,
-                tintColor: .blue
+                label: "Session (5h)",
+                utilization: aggregator.sessionUtilization,
+                tintColor: .white,
+                resetsAt: aggregator.usageData?.fiveHour?.resetsAt
             )
 
             UsageBarView(
                 label: "Weekly",
-                currentTokens: aggregator.weeklyOutputTokens,
-                limit: aggregator.weeklyTokenLimit,
-                tintColor: .orange
+                utilization: aggregator.weeklyUtilization,
+                tintColor: .white,
+                resetsAt: aggregator.usageData?.sevenDay?.resetsAt
             )
 
-            if let sessionId = aggregator.activeSessionId {
-                Text(String(sessionId.prefix(8)))
-                    .font(.system(size: 9))
-                    .foregroundStyle(.quaternary)
+            if aggregator.weeklyOpusUtilization > 0 {
+                UsageBarView(
+                    label: "Weekly (Opus)",
+                    utilization: aggregator.weeklyOpusUtilization,
+                    tintColor: .white,
+                    resetsAt: aggregator.usageData?.sevenDayOpus?.resetsAt
+                )
             }
 
             Divider()
 
-            if showSettings {
-                SettingsView(aggregator: aggregator)
-                Divider()
-            }
-
             HStack {
+                if aggregator.isLoading {
+                    ProgressView()
+                        .controlSize(.small)
+                }
+
                 Button {
-                    showSettings.toggle()
+                    Task { await aggregator.fetchUsage() }
                 } label: {
-                    Image(systemName: "gear")
+                    Image(systemName: "arrow.clockwise")
                         .font(.system(size: 13))
                 }
                 .buttonStyle(.plain)

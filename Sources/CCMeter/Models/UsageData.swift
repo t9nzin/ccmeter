@@ -1,21 +1,23 @@
 import Foundation
 
-struct UsageSnapshot {
-    var inputTokens: Int = 0
-    var outputTokens: Int = 0
-    var cacheCreationTokens: Int = 0
-    var cacheReadTokens: Int = 0
+struct UsageData: Codable, Equatable {
+    let fiveHour: UsageWindow?
+    let sevenDay: UsageWindow?
+    let sevenDayOpus: UsageWindow?
 
-    mutating func add(_ usage: TokenUsage) {
-        inputTokens += usage.input_tokens
-        outputTokens += usage.output_tokens
-        cacheCreationTokens += usage.cache_creation_input_tokens ?? 0
-        cacheReadTokens += usage.cache_read_input_tokens ?? 0
+    enum CodingKeys: String, CodingKey {
+        case fiveHour = "five_hour"
+        case sevenDay = "seven_day"
+        case sevenDayOpus = "seven_day_opus"
     }
 }
 
-struct ParsedUsageLine {
-    let sessionId: String?
-    let timestamp: Date?
-    let usage: TokenUsage
+struct UsageWindow: Codable, Equatable {
+    let utilization: Double // 0-100 percentage
+    let resetsAt: Date?
+
+    enum CodingKeys: String, CodingKey {
+        case utilization
+        case resetsAt = "resets_at"
+    }
 }
