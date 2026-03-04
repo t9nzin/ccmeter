@@ -1,3 +1,4 @@
+![](demo.png)
 # CCMeter - Claude Code Usage Meter
 
 A macOS menu bar app that shows your Claude Code usage in close to real-time.
