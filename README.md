@@ -31,3 +31,7 @@ Polling frequency adjusts based on usage:
 - **≥ 90%**: every 30 seconds
 
 The menu bar icon shows the Claude logo, which fills up circularly to reflect your current session (5h) utilization.
+
+## Notes
+
+This app reads your Claude Code OAuth token from the macOS Keychain. Review the source before running.
