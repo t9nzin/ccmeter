@@ -18,7 +18,6 @@ open CCMeter.app
 Click the menu bar icon to see:
 - **Session (5h)** - rolling 5-hour usage
 - **Weekly** - rolling 7-day usage
-- **Weekly (Opus)** - Opus-specific weekly usage
 
 ## How it works
 
