@@ -7,7 +7,7 @@ A macOS menu bar app that shows your Claude Code usage in close to real-time.
 ## Install
 
 ```bash
-git clone https://github.com/tenzin/ccmeter.git
+git clone https://github.com/t9nzin/ccmeter.git
 cd ccmeter
 ./build.sh
 open CCMeter.app
