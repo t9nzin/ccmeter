@@ -32,7 +32,7 @@ final class UsageAggregator {
         Task { await fetchUsage() }
 
         // Start polling
-        pollTimer = Timer.scheduledTimer(withTimeInterval: Constants.defaultPollInterval, repeats: true) { [weak self] _ in
+        pollTimer = Timer.scheduledTimer(withTimeInterval: Constants.pollInterval, repeats: true) { [weak self] _ in
             guard let self else { return }
             Task { await self.fetchUsage() }
         }
@@ -52,29 +52,8 @@ final class UsageAggregator {
             let data = try await APIService.fetchUsage()
             usageData = data
             lastError = nil
-            adjustPollInterval()
         } catch {
             lastError = describeError(error)
-        }
-    }
-
-    private func adjustPollInterval() {
-        let maxUtil = max(sessionUtilization, weeklyUtilization)
-        let interval: TimeInterval
-        if maxUtil >= 90 {
-            interval = Constants.minPollInterval
-        } else if maxUtil >= 75 {
-            interval = 45
-        } else if maxUtil >= 50 {
-            interval = Constants.defaultPollInterval
-        } else {
-            interval = Constants.maxPollInterval
-        }
-
-        pollTimer?.invalidate()
-        pollTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
-            guard let self else { return }
-            Task { await self.fetchUsage() }
         }
     }
 

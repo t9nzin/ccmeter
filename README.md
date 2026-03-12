@@ -23,11 +23,7 @@ Click the menu bar icon to see:
 
 CCMeter reads your Claude Code OAuth token from the macOS Keychain (stored by `claude login`) and polls the Anthropic usage API. No credentials are stored by CCMeter itself.
 
-Polling frequency adjusts based on usage:
-- **< 50%**: every 5 minutes
-- **50–74%**: every 60 seconds
-- **75–89%**: every 45 seconds
-- **≥ 90%**: every 30 seconds
+Polls every 2 minutes.
 
 The menu bar icon shows the Claude logo, which fills up circularly to reflect your current session (5h) utilization.
 

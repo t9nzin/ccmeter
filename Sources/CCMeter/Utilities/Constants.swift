@@ -11,8 +11,6 @@ enum Constants {
         static let serviceName = "Claude Code-credentials"
     }
 
-    // Polling intervals (seconds)
-    static let defaultPollInterval: TimeInterval = 60.0
-    static let minPollInterval: TimeInterval = 30.0
-    static let maxPollInterval: TimeInterval = 300.0
+    // Polling interval (seconds)
+    static let pollInterval: TimeInterval = 120.0
 }
